@@ -1,7 +1,15 @@
 ---
 
 # PowerShell Security Automation: 150 Useful Commands
-
+=> ## User & Group Management
+=> ## Audit & Event Log Monitoring
+=> ## File & Folder Security
+=> ## Patch & Update Management
+=> ## Network Security
+=> ## Malware & Threat Detection
+=> ## System Hardening & Configuration
+=> ## Audit Policy & Security Settings
+=> ## Active Directory Security
 ---
 
 ## User & Group Management
@@ -810,3 +818,4 @@
 - For AD commands, you need the **Active Directory module** and appropriate permissions.  
 - For Defender, you need Windows Defender installed and enabled.  
 - For some commands, you may need to install additional modules (e.g., `PSWindowsUpdate`).  
+
