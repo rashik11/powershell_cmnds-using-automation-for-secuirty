@@ -1,0 +1,812 @@
+---
+
+# PowerShell Security Automation: 150 Useful Commands
+
+---
+
+## User & Group Management
+
+1. **List all local users:**
+   ```
+   Get-LocalUser
+   ```
+
+2. **List all members of the Administrators group:**
+   ```
+   Get-LocalGroupMember -Group "Administrators"
+   ```
+
+3. **Disable a user account:**
+   ```
+   Disable-LocalUser -Name "username"
+   ```
+
+4. **Force password change at next logon:**
+   ```
+   Set-LocalUser -Name "username" -PasswordNeverExpires $false -UserMustChangePassword $true
+   ```
+
+5. **Find users with never-expiring passwords:**
+   ```
+   Get-LocalUser | Where-Object { $_.PasswordNeverExpires }
+   ```
+
+6. **Create a new local user:**
+   ```
+   New-LocalUser -Name "newuser" -Password (Read-Host -AsSecureString "Enter Password")
+   ```
+
+7. **Add a user to a local group:**
+   ```powershell
+   Add-LocalGroupMember -Group "Administrators" -Member "newuser"
+   ```
+
+8. **Remove a user from a local group:**
+   ```powershell
+   Remove-LocalGroupMember -Group "Administrators" -Member "olduser"
+   ```
+
+9. **Delete a local user:**
+   ```powershell
+   Remove-LocalUser -Name "olduser"
+   ```
+
+10. **List all disabled local users:**
+    ```powershell
+    Get-LocalUser | Where-Object { $_.Enabled -eq $false }
+    ```
+
+11. **Enable a disabled user account:**
+    ```powershell
+    Enable-LocalUser -Name "username"
+    ```
+
+12. **List all local groups:**
+    ```powershell
+    Get-LocalGroup
+    ```
+
+13. **Check if a user is a member of a group:**
+    ```powershell
+    Get-LocalGroupMember -Group "Administrators" | Where-Object { $_.Name -eq "username" }
+    ```
+
+14. **Get user account creation date:**
+    ```powershell
+    Get-LocalUser -Name "username" | Select-Object Name,Created
+    ```
+
+15. **List all users with expired passwords:**
+    ```powershell
+    Get-LocalUser | Where-Object { $_.PasswordExpired }
+    ```
+
+16. **List all local admin accounts:**
+    ```powershell
+    Get-LocalGroupMember -Group "Administrators" | Where-Object { $_.ObjectClass -eq "User" }
+    ```
+
+17. **Export all local users and groups to CSV:**
+    ```powershell
+    Get-LocalUser | Export-Csv -Path "C:\Users.csv" -NoTypeInformation
+    Get-LocalGroup | Export-Csv -Path "C:\Groups.csv" -NoTypeInformation
+    ```
+
+---
+
+## Audit & Event Log Monitoring
+
+18. **List failed logon attempts:**
+    ```powershell
+    Get-WinEvent -FilterHashtable @{LogName='Security';ID=4625} | Select-Object -First 10
+    ```
+
+19. **Export security event logs:**
+    ```powershell
+    Export-EventLog -LogName Security -Path "C:\Logs\SecurityLog.evtx"
+    ```
+
+20. **Monitor for new local user creation:**
+    ```powershell
+    Get-WinEvent -FilterHashtable @{LogName='Security';ID=4720}
+    ```
+
+21. **Check for cleared event logs:**
+    ```powershell
+    Get-WinEvent -FilterHashtable @{LogName='Security';ID=1102}
+    ```
+
+22. **List all event logs:**
+    ```powershell
+    Get-EventLog -List
+    ```
+
+23. **List all logon events:**
+    ```powershell
+    Get-WinEvent -FilterHashtable @{LogName='Security';ID=4624}
+    ```
+
+24. **List all logoff events:**
+    ```powershell
+    Get-WinEvent -FilterHashtable @{LogName='Security';ID=4634}
+    ```
+
+25. **Find all account lockout events:**
+    ```powershell
+    Get-WinEvent -FilterHashtable @{LogName='Security';ID=4740}
+    ```
+
+26. **Find all privilege use events:**
+    ```powershell
+    Get-WinEvent -FilterHashtable @{LogName='Security';ID=4672}
+    ```
+
+27. **Export Application event log:**
+    ```powershell
+    Export-EventLog -LogName Application -Path "C:\Logs\ApplicationLog.evtx"
+    ```
+
+28. **Clear the Security event log:**
+    ```powershell
+    Clear-EventLog -LogName Security
+    ```
+
+29. **Find all events from a specific user:**
+    ```powershell
+    Get-WinEvent -FilterHashtable @{LogName='Security'} | Where-Object { $_.Properties[5].Value -eq "username" }
+    ```
+
+30. **Monitor event log for specific event in real-time:**
+    ```powershell
+    Register-WmiEvent -Query "Select * from __InstanceCreationEvent within 1 where TargetInstance isa 'Win32_NTLogEvent' and TargetInstance.EventCode = '4625'" -Action { Write-Host "Failed logon detected!" }
+    ```
+
+31. **List all event log sources:**
+    ```powershell
+    Get-EventLog -LogName Security -List | Select-Object -ExpandProperty Sources
+    ```
+
+32. **Get event log size:**
+    ```powershell
+    Get-EventLog -List | Select-Object Log, MaximumKilobytes, FileSize
+    ```
+
+---
+
+## File & Folder Security
+
+33. **Check NTFS permissions on a folder:**
+    ```powershell
+    Get-Acl "C:\SensitiveFolder" | Format-List
+    ```
+
+34. **Find files with Everyone:FullControl:**
+    ```powershell
+    Get-ChildItem -Path C:\ -Recurse | Where-Object {
+        (Get-Acl $_.FullName).Access | Where-Object { $_.IdentityReference -eq "Everyone" -and $_.FileSystemRights -eq "FullControl" }
+    }
+    ```
+
+35. **Monitor changes in a directory (using FileSystemWatcher):**
+    ```powershell
+    $watcher = New-Object System.IO.FileSystemWatcher
+    $watcher.Path = "C:\SensitiveFolder"
+    $watcher.EnableRaisingEvents = $true
+    Register-ObjectEvent $watcher "Changed" -Action { Write-Host "File changed: $($Event.SourceEventArgs.FullPath)" }
+    ```
+
+36. **List recently modified files:**
+    ```powershell
+    Get-ChildItem -Path "C:\SensitiveFolder" -Recurse | Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-1) }
+    ```
+
+37. **Check for hidden files:**
+    ```powershell
+    Get-ChildItem -Path C:\ -Recurse -Force | Where-Object { $_.Attributes -match "Hidden" }
+    ```
+
+38. **Set NTFS permissions on a folder:**
+    ```powershell
+    $acl = Get-Acl "C:\SensitiveFolder"
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("username","ReadData","Allow")
+    $acl.AddAccessRule($rule)
+    Set-Acl "C:\SensitiveFolder" $acl
+    ```
+
+39. **Remove NTFS permission for a user:**
+    ```powershell
+    $acl = Get-Acl "C:\SensitiveFolder"
+    $acl.Access | Where-Object { $_.IdentityReference -eq "username" } | ForEach-Object { $acl.RemoveAccessRule($_) }
+    Set-Acl "C:\SensitiveFolder" $acl
+    ```
+
+40. **Find files larger than 100MB:**
+    ```powershell
+    Get-ChildItem -Path C:\ -Recurse | Where-Object { $_.Length -gt 100MB }
+    ```
+
+41. **Find files modified in the last hour:**
+    ```powershell
+    Get-ChildItem -Path C:\SensitiveFolder -Recurse | Where-Object { $_.LastWriteTime -gt (Get-Date).AddHours(-1) }
+    ```
+
+42. **List all files owned by a specific user:**
+    ```powershell
+    Get-ChildItem -Path C:\SensitiveFolder -Recurse | Where-Object { (Get-Acl $_.FullName).Owner -eq "DOMAIN\username" }
+    ```
+
+43. **Find all files with SYSTEM:FullControl:**
+    ```powershell
+    Get-ChildItem -Path C:\ -Recurse | Where-Object {
+        (Get-Acl $_.FullName).Access | Where-Object { $_.IdentityReference -eq "SYSTEM" -and $_.FileSystemRights -eq "FullControl" }
+    }
+    ```
+
+44. **List all files with inherited permissions disabled:**
+    ```powershell
+    Get-ChildItem -Path C:\SensitiveFolder -Recurse | Where-Object { -not (Get-Acl $_.FullName).AreAccessRulesProtected }
+    ```
+
+45. **Find all files with execute permissions for Everyone:**
+    ```powershell
+    Get-ChildItem -Path C:\ -Recurse | Where-Object {
+        (Get-Acl $_.FullName).Access | Where-Object { $_.IdentityReference -eq "Everyone" -and $_.FileSystemRights -match "ExecuteFile" }
+    }
+    ```
+
+46. **List all files with no owner:**
+    ```powershell
+    Get-ChildItem -Path C:\SensitiveFolder -Recurse | Where-Object { (Get-Acl $_.FullName).Owner -eq $null }
+    ```
+
+47. **Find all files with alternate data streams:**
+    ```powershell
+    Get-ChildItem -Path C:\SensitiveFolder -Recurse | ForEach-Object { Get-Item $_.FullName -Stream * }
+    ```
+
+---
+
+## Patch & Update Management
+
+48. **List installed updates:**
+    ```powershell
+    Get-HotFix
+    ```
+
+49. **Check for pending Windows updates (requires PSWindowsUpdate module):**
+    ```powershell
+    Get-WindowsUpdate
+    ```
+
+50. **Install all available updates (requires PSWindowsUpdate):**
+    ```powershell
+    Install-WindowsUpdate -AcceptAll -AutoReboot
+    ```
+
+51. **Check for outdated software (example with Chocolatey):**
+    ```powershell
+    choco outdated
+    ```
+
+52. **List all installed programs:**
+    ```powershell
+    Get-WmiObject -Class Win32_Product | Select-Object Name, Version
+    ```
+
+53. **List all pending updates (Windows Update):**
+    ```powershell
+    Get-WindowsUpdate -IsPending
+    ```
+
+54. **List all failed updates:**
+    ```powershell
+    Get-WindowsUpdateLog | Select-String "Failed"
+    ```
+
+55. **Check for updates on remote computer:**
+    ```powershell
+    Invoke-Command -ComputerName "RemotePC" -ScriptBlock { Get-WindowsUpdate }
+    ```
+
+56. **List all updates installed in the last 30 days:**
+    ```powershell
+    Get-HotFix | Where-Object { $_.InstalledOn -gt (Get-Date).AddDays(-30) }
+    ```
+
+57. **Uninstall a specific update:**
+    ```powershell
+    wusa /uninstall /kb:1234567 /quiet /norestart
+    ```
+
+58. **Check Windows Update service status:**
+    ```powershell
+    Get-Service -Name wuauserv
+    ```
+
+59. **Start Windows Update service:**
+    ```powershell
+    Start-Service -Name wuauserv
+    ```
+
+60. **Stop Windows Update service:**
+    ```powershell
+    Stop-Service -Name wuauserv
+    ```
+
+61. **Restart Windows Update service:**
+    ```powershell
+    Restart-Service -Name wuauserv
+    ```
+
+62. **List all update history:**
+    ```powershell
+    Get-WmiObject -Class "Win32_QuickFixEngineering"
+    ```
+
+---
+
+## Network Security
+
+63. **List all open network connections:**
+    ```powershell
+    Get-NetTCPConnection
+    ```
+
+64. **List all listening ports:**
+    ```powershell
+    Get-NetTCPConnection | Where-Object { $_.State -eq "Listen" }
+    ```
+
+65. **Get firewall rules:**
+    ```powershell
+    Get-NetFirewallRule
+    ```
+
+66. **Block an IP address in Windows Firewall:**
+    ```powershell
+    New-NetFirewallRule -DisplayName "Block Malicious IP" -Direction Inbound -RemoteAddress "1.2.3.4" -Action Block
+    ```
+
+67. **List all enabled firewall rules:**
+    ```powershell
+    Get-NetFirewallRule | Where-Object { $_.Enabled -eq "True" }
+    ```
+
+68. **List all active network adapters:**
+    ```powershell
+    Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
+    ```
+
+69. **Disable a network adapter:**
+    ```powershell
+    Disable-NetAdapter -Name "Ethernet" -Confirm:$false
+    ```
+
+70. **Enable a network adapter:**
+    ```powershell
+    Enable-NetAdapter -Name "Ethernet"
+    ```
+
+71. **Get IP configuration:**
+    ```powershell
+    Get-NetIPAddress
+    ```
+
+72. **List all ARP entries:**
+    ```powershell
+    Get-NetNeighbor
+    ```
+
+73. **Flush DNS cache:**
+    ```powershell
+    Clear-DnsClientCache
+    ```
+
+74. **List all DNS servers:**
+    ```powershell
+    Get-DnsClientServerAddress
+    ```
+
+75. **Test network connectivity:**
+    ```powershell
+    Test-Connection -ComputerName google.com -Count 4
+    ```
+
+76. **Get routing table:**
+    ```powershell
+    Get-NetRoute
+    ```
+
+77. **List all wireless networks:**
+    ```powershell
+    netsh wlan show networks
+    ```
+
+78. **List all firewall profiles:**
+    ```powershell
+    Get-NetFirewallProfile
+    ```
+
+79. **Enable Windows Firewall:**
+    ```powershell
+    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
+    ```
+
+80. **Disable Windows Firewall:**
+    ```powershell
+    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+    ```
+
+81. **Allow a program through firewall:**
+    ```powershell
+    New-NetFirewallRule -DisplayName "Allow MyApp" -Direction Inbound -Program "C:\Path\To\MyApp.exe" -Action Allow
+    ```
+
+82. **Remove a firewall rule:**
+    ```powershell
+    Remove-NetFirewallRule -DisplayName "Allow MyApp"
+    ```
+
+83. **List all blocked firewall rules:**
+    ```powershell
+    Get-NetFirewallRule | Where-Object { $_.Action -eq "Block" }
+    ```
+
+84. **Export firewall rules:**
+    ```powershell
+    netsh advfirewall export "C:\firewall-config.wfw"
+    ```
+
+85. **Import firewall rules:**
+    ```powershell
+    netsh advfirewall import "C:\firewall-config.wfw"
+    ```
+
+86. **List all open UDP ports:**
+    ```powershell
+    Get-NetUDPEndpoint
+    ```
+
+87. **Check for port 3389 (RDP) status:**
+    ```powershell
+    Get-NetTCPConnection -LocalPort 3389
+    ```
+
+---
+
+## Malware & Threat Detection
+
+88. **Scan with Windows Defender:**
+    ```powershell
+    Start-MpScan -ScanType FullScan
+    ```
+
+89. **Get recent threats detected by Defender:**
+    ```powershell
+    Get-MpThreatDetection
+    ```
+
+90. **Update Defender signatures:**
+    ```powershell
+    Update-MpSignature
+    ```
+
+91. **List Defender exclusions:**
+    ```powershell
+    Get-MpPreference | Select-Object -ExpandProperty ExclusionPath
+    ```
+
+92. **Check Defender status:**
+    ```powershell
+    Get-MpComputerStatus
+    ```
+
+93. **List all Defender quarantined items:**
+    ```powershell
+    Get-MpThreat | Where-Object { $_.Action -eq "Quarantine" }
+    ```
+
+94. **Remove all Defender quarantined items:**
+    ```powershell
+    Remove-MpThreat
+    ```
+
+95. **List all Defender allowed threats:**
+    ```powershell
+    Get-MpThreat | Where-Object { $_.Action -eq "Allow" }
+    ```
+
+96. **Start a quick scan with Defender:**
+    ```powershell
+    Start-MpScan -ScanType QuickScan
+    ```
+
+97. **List all Defender preferences:**
+    ```powershell
+    Get-MpPreference
+    ```
+
+98. **Add a Defender exclusion:**
+    ```powershell
+    Set-MpPreference -ExclusionPath "C:\Temp"
+    ```
+
+99. **Remove a Defender exclusion:**
+    ```powershell
+    Set-MpPreference -ExclusionPath @()
+    ```
+
+100. **Check Defender real-time protection status:**
+    ```powershell
+    (Get-MpPreference).DisableRealtimeMonitoring
+    ```
+
+101. **Enable Defender real-time protection:**
+    ```powershell
+    Set-MpPreference -DisableRealtimeMonitoring $false
+    ```
+
+102. **Disable Defender real-time protection:**
+    ```powershell
+    Set-MpPreference -DisableRealtimeMonitoring $true
+    ```
+
+---
+
+## System Hardening & Configuration
+
+103. **List all running services:**
+    ```powershell
+    Get-Service | Where-Object { $_.Status -eq "Running" }
+    ```
+
+104. **Check for unnecessary services (example: Telnet):**
+    ```powershell
+    Get-Service -Name telnet
+    ```
+
+105. **Disable a service:**
+    ```powershell
+    Set-Service -Name "telnet" -StartupType Disabled
+    ```
+
+106. **List all scheduled tasks:**
+    ```powershell
+    Get-ScheduledTask
+    ```
+
+107. **Check for unsigned drivers:**
+    ```powershell
+    Get-WmiObject Win32_PnPSignedDriver | Where-Object { $_.IsSigned -eq $false }
+    ```
+
+108. **List all installed services:**
+    ```powershell
+    Get-Service
+    ```
+
+109. **List all services set to auto start:**
+    ```powershell
+    Get-Service | Where-Object { $_.StartType -eq "Automatic" }
+    ```
+
+110. **List all stopped services:**
+    ```powershell
+    Get-Service | Where-Object { $_.Status -eq "Stopped" }
+    ```
+
+111. **Start a service:**
+    ```powershell
+    Start-Service -Name "wuauserv"
+    ```
+
+112. **Stop a service:**
+    ```powershell
+    Stop-Service -Name "wuauserv"
+    ```
+
+113. **Restart a service:**
+    ```powershell
+    Restart-Service -Name "wuauserv"
+    ```
+
+114. **List all running processes:**
+    ```powershell
+    Get-Process
+    ```
+
+115. **Kill a process by name:**
+    ```powershell
+    Stop-Process -Name "notepad"
+    ```
+
+116. **List all processes running as SYSTEM:**
+    ```powershell
+    Get-Process | Where-Object { $_.Path -and (Get-Process -Id $_.Id -IncludeUserName).UserName -eq "NT AUTHORITY\SYSTEM" }
+    ```
+
+117. **List all scheduled tasks with highest privileges:**
+    ```powershell
+    Get-ScheduledTask | Where-Object { $_.Principal.RunLevel -eq "Highest" }
+    ```
+
+118. **Disable a scheduled task:**
+    ```powershell
+    Disable-ScheduledTask -TaskName "TaskName"
+    ```
+
+119. **Enable a scheduled task:**
+    ```powershell
+    Enable-ScheduledTask -TaskName "TaskName"
+    ```
+
+120. **Delete a scheduled task:**
+    ```powershell
+    Unregister-ScheduledTask -TaskName "TaskName" -Confirm:$false
+    ```
+
+121. **List all startup programs:**
+    ```powershell
+    Get-CimInstance -ClassName Win32_StartupCommand
+    ```
+
+122. **List all installed drivers:**
+    ```powershell
+    Get-WmiObject Win32_PnPSignedDriver
+    ```
+
+123. **List all unsigned drivers:**
+    ```powershell
+    Get-WmiObject Win32_PnPSignedDriver | Where-Object { $_.IsSigned -eq $false }
+    ```
+
+124. **List all running tasks:**
+    ```powershell
+    Get-ScheduledTask | Where-Object { $_.State -eq "Running" }
+    ```
+
+125. **List all registry autoruns:**
+    ```powershell
+    Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run"
+    ```
+
+126. **List all local policies:**
+    ```powershell
+    secedit /export /cfg C:\localpol.cfg
+    ```
+
+127. **Check if SMBv1 is enabled:**
+    ```powershell
+    Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol
+    ```
+
+128. **List all scheduled tasks running as SYSTEM:**
+    ```powershell
+    Get-ScheduledTask | Where-Object { $_.Principal.UserId -eq "SYSTEM" }
+    ```
+
+129. **Check for RDP enabled:**
+    ```powershell
+    Get-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections"
+    ```
+
+130. **Check for unsigned PowerShell scripts in a directory:**
+    ```powershell
+    Get-ChildItem -Path "C:\Scripts" -Filter *.ps1 | Get-AuthenticodeSignature | Where-Object { $_.Status -ne "Valid" }
+    ```
+
+---
+
+## Audit Policy & Security Settings
+
+131. **List current audit policies:**
+    ```powershell
+    AuditPol /get /category:*
+    ```
+
+132. **Enable auditing for logon events:**
+    ```powershell
+    AuditPol /set /category:"Logon/Logoff" /success:enable /failure:enable
+    ```
+
+133. **Check password policy:**
+    ```powershell
+    net accounts
+    ```
+
+134. **List local security policies:**
+    ```powershell
+    secedit /export /cfg C:\secpol.cfg
+    ```
+
+135. **Check UAC status:**
+    ```powershell
+    Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableLUA"
+    ```
+
+---
+
+## Active Directory Security (if applicable)
+
+136. **List all AD users:**
+    ```powershell
+    Get-ADUser -Filter * -Properties *
+    ```
+
+137. **Find AD users with password never expires:**
+    ```powershell
+    Get-ADUser -Filter * -Properties PasswordNeverExpires | Where-Object { $_.PasswordNeverExpires }
+    ```
+
+138. **List all AD groups:**
+    ```powershell
+    Get-ADGroup -Filter *
+    ```
+
+139. **Find AD users not logged in for 90 days:**
+    ```powershell
+    Get-ADUser -Filter * -Properties LastLogonDate | Where-Object { $_.LastLogonDate -lt (Get-Date).AddDays(-90) }
+    ```
+
+140. **List all computers in AD:**
+    ```powershell
+    Get-ADComputer -Filter *
+    ```
+
+141. **Find all AD users with admin rights:**
+    ```powershell
+    Get-ADUser -Filter * -Properties MemberOf | Where-Object { $_.MemberOf -match "Administrators" }
+    ```
+
+142. **List all AD computers not logged in for 90 days:**
+    ```powershell
+    Get-ADComputer -Filter * -Properties LastLogonDate | Where-Object { $_.LastLogonDate -lt (Get-Date).AddDays(-90) }
+    ```
+
+143. **Find all AD groups with more than 10 members:**
+    ```powershell
+    Get-ADGroup -Filter * | Where-Object { (Get-ADGroupMember $_.DistinguishedName).Count -gt 10 }
+    ```
+
+144. **List all AD users with blank description:**
+    ```powershell
+    Get-ADUser -Filter * | Where-Object { $_.Description -eq $null }
+    ```
+
+145. **List all AD users with no email:**
+    ```powershell
+    Get-ADUser -Filter * | Where-Object { $_.EmailAddress -eq $null }
+    ```
+
+146. **List all AD users with expired passwords:**
+    ```powershell
+    Get-ADUser -Filter * -Properties PasswordExpired | Where-Object { $_.PasswordExpired }
+    ```
+
+147. **List all AD users with password set to never expire:**
+    ```powershell
+    Get-ADUser -Filter * -Properties PasswordNeverExpires | Where-Object { $_.PasswordNeverExpires }
+    ```
+
+148. **List all AD users with last logon older than 180 days:**
+    ```powershell
+    Get-ADUser -Filter * -Properties LastLogonDate | Where-Object { $_.LastLogonDate -lt (Get-Date).AddDays(-180) }
+    ```
+
+149. **List all AD groups with no members:**
+    ```powershell
+    Get-ADGroup -Filter * | Where-Object { (Get-ADGroupMember $_.DistinguishedName).Count -eq 0 }
+    ```
+
+150. **Export all AD users to CSV:**
+    ```powershell
+    Get-ADUser -Filter * | Select-Object Name,SamAccountName,Enabled | Export-Csv -Path "C:\ADUsers.csv" -NoTypeInformation
+    ```
+
+---
+
+**Note:**  
+- Some commands require **administrative privileges**.  
+- For AD commands, you need the **Active Directory module** and appropriate permissions.  
+- For Defender, you need Windows Defender installed and enabled.  
+- For some commands, you may need to install additional modules (e.g., `PSWindowsUpdate`).  
